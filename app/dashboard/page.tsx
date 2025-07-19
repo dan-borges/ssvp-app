@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import axios from 'axios'
+import { aplicarMascaraCPF, removerMascaraCPF } from '@/lib/cpf'
 
 interface Registro {
     id: number
@@ -25,6 +26,8 @@ export default function ConsultaRegistro() {
 
     const [showCadastro, setShowCadastro] = useState(false)
     const [nome, setNome] = useState('')
+    const [confirmandoRetirada, setConfirmandoRetirada] = useState(false)
+    const paroquiaLocal = localStorage.getItem('paroquia') || '';
 
     useEffect(() => {
         const paroquia = localStorage.getItem('paroquiaId')
@@ -44,16 +47,21 @@ export default function ConsultaRegistro() {
         setLoading(true)
 
         try {
-            const response = await axios.get<Registro[]>(`/api/dashboard?cpf=${cpf}`);
-
+            const cpfLimpo = removerMascaraCPF(cpf)
+            const response = await axios.get<Registro[]>(`/api/dashboard?cpf=${cpfLimpo}`);
 
             if (response.data.length > 0) {
-                setRegistros(response.data)
+                const registrosOrdenados = response.data.sort((a, b) => {
+                    const dataA = new Date(a.data.split('/').reverse().join('-'))
+                    const dataB = new Date(b.data.split('/').reverse().join('-'))
+                    return dataB.getTime() - dataA.getTime()
+                })
+                setRegistros(registrosOrdenados)
             } else {
                 setErro('Nenhum registro encontrado.')
                 setShowCadastro(true)
             }
-        } catch (err) {
+        } catch (err: unknown) {
             setErro('Erro ao buscar registro.')
             setShowCadastro(true)
         } finally {
@@ -71,28 +79,87 @@ export default function ConsultaRegistro() {
         }
 
         try {
+            const cpfLimpo = removerMascaraCPF(cpf)
             await axios.post('/api/entrega', {
-                cpf: cpf,
+                cpf: cpfLimpo,
                 nome: nome,
                 paroquia: parseInt(paroquiaId)
             })
             setShowCadastro(false)
             setNome('')
             buscarRegistro() // rebusca após cadastrar
-        } catch (error) {
+        } catch (error: unknown) {
             setErro('Erro ao cadastrar nova pessoa.')
+        }
+    }
+
+    async function confirmarRetirada(registroId: number) {
+        setErro('')
+        setConfirmandoRetirada(true)
+
+        try {
+            // TODO: Implementar chamada para API de confirmação de retirada
+            // await axios.post('/api/confirmar-retirada', {
+            //     registroId: registroId,
+            //     paroquiaId: localStorage.getItem('paroquiaId')
+            // })
+            
+            console.log('Confirmando retirada para registro:', registroId)
+            // Por enquanto, apenas mostra uma mensagem de sucesso
+            alert('Retirada confirmada com sucesso!')
+            
+        } catch (error: unknown) {
+            setErro('Erro ao confirmar retirada.')
+        } finally {
+            setConfirmandoRetirada(false)
+        }
+    }
+
+    function extrairMes(data: string): string {
+        try {
+            // Para datas no formato DD/MM/YYYY, precisamos converter para MM/DD/YYYY
+            const partes = data.split('/')
+            if (partes.length === 3) {
+                const dia = partes[0]
+                const mes = partes[1]
+                const ano = partes[2]
+                // Criar data no formato MM/DD/YYYY
+                const dataFormatada = `${mes}/${dia}/${ano}`
+                const dataObj = new Date(dataFormatada)
+                const mesNome = dataObj.toLocaleDateString('pt-BR', { month: 'long' })
+                return mesNome.charAt(0).toUpperCase() + mesNome.slice(1) // Primeira letra maiúscula
+            }
+            return 'Mês'
+        } catch {
+            return 'Mês'
         }
     }
 
     return (
         <div className="max-w-md mx-auto p-6 space-y-4">
-            <h1 className="text-xl font-bold text-center">Consultar Registro</h1>
+            <div className="flex justify-center mb-4">
+                <img 
+                    src="/assets/ssvp_logo.png" 
+                    alt="SSVP Logo" 
+                    className="h-32 w-auto"
+                />
+            </div>
+            <div className="flex flex-col items-center justify-center"> 
+                <h1 className="text-xl font-bold text-center"> {paroquiaLocal} </h1>
+                <p className="text-md font-bold text-center"> Registrar Entrega </p>
+            </div>
 
             <div className="flex gap-2">
                 <Input
                     placeholder="Digite o CPF"
                     value={cpf}
-                    onChange={(e) => setCpf(e.target.value)}
+                    onChange={(e) => setCpf(aplicarMascaraCPF(e.target.value))}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !loading) {
+                            buscarRegistro()
+                        }
+                    }}
+                    maxLength={14}
                 />
                 <Button onClick={buscarRegistro} disabled={loading}>
                     {loading ? 'Buscando...' : 'Buscar'}
@@ -103,9 +170,9 @@ export default function ConsultaRegistro() {
 
             {showCadastro && (
                 <div className="border border-yellow-400 bg-yellow-50 p-4 rounded space-y-2 mt-4">
-                    <p>CPF não encontrado. Deseja cadastrar uma nova pessoa?</p>
+                    <p>CPF não encontrado. Deseja cadastrar?</p>
                     <Input
-                        placeholder="Nome completo"
+                        placeholder="Digite o nome e sobrenome"
                         value={nome}
                         onChange={(e) => setNome(e.target.value)}
                     />
@@ -116,27 +183,55 @@ export default function ConsultaRegistro() {
             )}
 
             {registros.length > 0 && (
-                <div className="space-y-4 mt-4">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>
-                                {registros[0].nome} - {registros[0].cpf}
-                            </CardTitle>
+                <div className="space-y-2 mt-4">
+                    <Card className="py-3 px-4">
+                        <CardHeader className="flex flex-row items-center justify-between p-0">
+                            <div>
+                                <CardTitle>
+                                    {registros[0].nome}
+                                </CardTitle>
+                                <div className="p-0">
+                                    {aplicarMascaraCPF(registros[0].cpf)}
+                                </div>
+                            </div>
+                            <Button 
+                                onClick={() => confirmarRetirada(registros[0].id)}
+                                disabled={confirmandoRetirada}
+                                className="bg-green-600 hover:bg-green-700 text-white"
+                            >
+                                {confirmandoRetirada ? 'Confirmando...' : 'Confirmar Retirada'}
+                            </Button>
                         </CardHeader>
                     </Card>
 
-                    {registros.map((registro) => (
-                        <Card key={registro.id}>
-                            <CardContent className="space-y-2 text-sm">
-                                <p>
-                                    <strong>Paróquia:</strong> {registro.paroquia}
-                                </p>
-                                <p>
-                                    <strong>Retirada:</strong> {registro.data}
-                                </p>
-                            </CardContent>
-                        </Card>
-                    ))}
+                    {registros.map((registro) => {
+
+                        const mesmaParoquia = registro.paroquia === paroquiaLocal;
+                        const corBg = mesmaParoquia ? 'bg-green-100' : 'bg-red-100';
+                        const corBorder = mesmaParoquia ? 'border-green-300' : 'border-red-300';
+                        
+                        return (
+                            <Card key={registro.id} className={`${corBg} ${corBorder}`}>
+                                <CardContent className="flex items-center justify-between px-4">
+                                    <div className="space-y-2 text-sm">
+                                        <p>
+                                        <strong className="text-xl font-bold text-gray-700"> 
+                                            {registro.paroquia}</strong>
+                                        </p>
+                                        <p>
+                                        Retirada: <strong className="text-xl font-bold text-gray-700"> 
+                                            {registro.data}</strong>
+                                        </p>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="text-3xl font-bold text-gray-700">
+                                            {extrairMes(registro.data)}
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        );
+                    })}
                 </div>
             )}
         </div>

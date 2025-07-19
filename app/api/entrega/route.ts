@@ -25,10 +25,11 @@ export async function POST(req: NextRequest) {
         )
 
         return NextResponse.json(response.data)
-    } catch (error: any) {
-        console.error('Erro ao registrar entrega:', error.message)
+    } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
+        console.error('Erro ao registrar entrega:', errorMessage)
         return NextResponse.json(
-            { error: 'Erro ao registrar entrega.', detail: error.response?.data || null },
+            { error: 'Erro ao registrar entrega.', detail: null },
             { status: 500 }
         )
     }
