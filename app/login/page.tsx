@@ -21,8 +21,6 @@ export default function LoginPage() {
         senha,
       })
 
-      const token = response.data?.token
-
       const dados = response.data
 
       if (dados?.id) {
@@ -35,7 +33,7 @@ export default function LoginPage() {
         setErro('Credenciais inválidas.')
       }
 
-    } catch (err) {
+    } catch (err: unknown) {
       setErro('Erro ao fazer login.')
       console.error(err)
     }
@@ -44,6 +42,13 @@ export default function LoginPage() {
   return (
     <div className="flex flex-col justify-center items-center h-screen px-4">
       <div className="w-full max-w-sm space-y-4 p-6 border rounded">
+        <div className="flex justify-center mb-4">
+          <img 
+            src="/assets/ssvp_logo.png" 
+            alt="SSVP Logo" 
+            className="h-20 w-auto"
+          />
+        </div>
         <h1 className="text-xl font-bold text-center">Login</h1>
 
         <Input

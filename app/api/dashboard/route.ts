@@ -23,10 +23,11 @@ export async function GET(req: NextRequest) {
         )
 
         return NextResponse.json(response.data)
-    } catch (error: any) {
-        console.error('Erro no proxy dashboard:', error.message)
+    } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
+        console.error('Erro no proxy dashboard:', errorMessage)
         return NextResponse.json(
-            { error: 'Erro ao buscar registros', detail: error.response?.data || null },
+            { error: 'Erro ao buscar registros', detail: null },
             { status: 500 }
         )
     }
