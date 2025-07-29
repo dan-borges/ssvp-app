@@ -96,17 +96,26 @@ export default function ConsultaRegistro() {
     async function confirmarRetirada(registroId: number) {
         setErro('')
         setConfirmandoRetirada(true)
+        const paroquiaId = localStorage.getItem('paroquiaId')
+
+        if (!paroquiaId) {
+            setErro('ID da paróquia não encontrado.')
+            setConfirmandoRetirada(false)
+            return
+        }
 
         try {
-            // TODO: Implementar chamada para API de confirmação de retirada
-            // await axios.post('/api/confirmar-retirada', {
-            //     registroId: registroId,
-            //     paroquiaId: localStorage.getItem('paroquiaId')
-            // })
+            // Usa a mesma API de cadastrarPessoa com os dados do primeiro registro
+            const cpfLimpo = removerMascaraCPF(registros[0].cpf)
+            await axios.post('/api/entrega', {
+                cpf: cpfLimpo,
+                nome: registros[0].nome,
+                paroquia: parseInt(paroquiaId)
+            })
             
-            console.log('Confirmando retirada para registro:', registroId)
-            // Por enquanto, apenas mostra uma mensagem de sucesso
             alert('Retirada confirmada com sucesso!')
+            // Rebusca os registros para atualizar a lista
+            buscarRegistro()
             
         } catch (error: unknown) {
             setErro('Erro ao confirmar retirada.')
@@ -133,6 +142,22 @@ export default function ConsultaRegistro() {
         } catch {
             return 'Mês'
         }
+    }
+
+    function temRegistroNoMesAtual(registros: Registro[]): boolean {
+        const hoje = new Date()
+        const mesAtual = hoje.getMonth() + 1 // getMonth() retorna 0-11
+        const anoAtual = hoje.getFullYear()
+        
+        return registros.some(registro => {
+            const partes = registro.data.split('/')
+            if (partes.length === 3) {
+                const mesRegistro = parseInt(partes[1])
+                const anoRegistro = parseInt(partes[2])
+                return mesRegistro === mesAtual && anoRegistro === anoAtual
+            }
+            return false
+        })
     }
 
     return (
@@ -196,10 +221,19 @@ export default function ConsultaRegistro() {
                             </div>
                             <Button 
                                 onClick={() => confirmarRetirada(registros[0].id)}
-                                disabled={confirmandoRetirada}
-                                className="bg-green-600 hover:bg-green-700 text-white"
+                                disabled={confirmandoRetirada || temRegistroNoMesAtual(registros)}
+                                className={`${
+                                    temRegistroNoMesAtual(registros) 
+                                        ? 'bg-gray-400 cursor-not-allowed' 
+                                        : 'bg-green-600 hover:bg-green-700'
+                                } text-white`}
                             >
-                                {confirmandoRetirada ? 'Confirmando...' : 'Confirmar Retirada'}
+                                {confirmandoRetirada 
+                                    ? 'Confirmando...' 
+                                    : temRegistroNoMesAtual(registros) 
+                                        ? 'Já retirado este mês' 
+                                        : 'Confirmar Retirada'
+                                }
                             </Button>
                         </CardHeader>
                     </Card>
